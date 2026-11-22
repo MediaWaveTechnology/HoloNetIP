@@ -13,9 +13,9 @@ def kinds(text):
 
 
 def test_lan_ips_are_flagged_and_documentation_range_is_not():
-    assert kinds("gw 192.168.50.1") == ["policy:lan-ip"]
-    assert kinds("host 10.0.0.5") == ["policy:lan-ip"]
-    assert kinds("host 172.20.1.9") == ["policy:lan-ip"]
+    assert kinds("gw 192.168.50.1") == ["policy:lan-ip"]  # secretscan: allow fixture
+    assert kinds("host 10.0.0.5") == ["policy:lan-ip"]  # secretscan: allow fixture
+    assert kinds("host 172.20.1.9") == ["policy:lan-ip"]  # secretscan: allow fixture
     assert kinds("doc 192.0.2.10 and 198.51.100.7") == []
     assert kinds("loopback 127.0.0.1 any 0.0.0.0") == []
 
@@ -23,13 +23,13 @@ def test_lan_ips_are_flagged_and_documentation_range_is_not():
 def test_mac_allowlist_passes_fixture_prefixes_and_flags_real_ones():
     assert kinds("mac 02:00:00:00:00:1f") == []
     assert kinds("mac 00:00:5e:00:53:01") == []
-    assert kinds("mac f4:5c:89:12:ab:cd") == ["policy:mac"]
-    assert kinds("mac F4-5C-89-12-AB-CD") == ["policy:mac"]
+    assert kinds("mac f4:5c:89:12:ab:cd") == ["policy:mac"]  # secretscan: allow fixture
+    assert kinds("mac F4-5C-89-12-AB-CD") == ["policy:mac"]  # secretscan: allow fixture
 
 
 def test_masking_never_returns_the_full_value():
-    assert scan.mask_ip("192.168.50.1") == "192.168.x.x"
-    assert scan.mask_mac("F4:5C:89:12:AB:CD") == "f4:5c:89:xx:xx:xx"
+    assert scan.mask_ip("192.168.50.1") == "192.168.x.x"  # secretscan: allow fixture
+    assert scan.mask_mac("F4:5C:89:12:AB:CD") == "f4:5c:89:xx:xx:xx"  # secretscan: allow fixture
 
 
 def test_self_test_passes_with_the_installed_engine(tmp_path):

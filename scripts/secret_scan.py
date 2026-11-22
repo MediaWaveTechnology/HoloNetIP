@@ -43,6 +43,24 @@ LAN_IP = re.compile(
 )
 MAC = re.compile(r"(?<![0-9A-Fa-f:-])((?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})(?![0-9A-Fa-f:-])")
 ALLOWED_MAC_PREFIXES = ("02:00:00", "00:00:5e", "aa:bb:cc", "00:00:00", "ff:ff:ff")
+ALLOW = re.compile(r"secretscan:\s*allow\s+(\S.*?)\s*$")
+
+
+def allow_reason(line):
+    """Return the reason if a line carries a reviewed exemption marker, else None.
+
+    Suppressed findings are still written to the report under "suppressed".
+    """
+    m = ALLOW.search(line)
+    return m.group(1) if m else None
+
+
+def _route(row, reason, findings, suppressed):
+    """Send a finding to the suppressed list (with its reason) or to findings."""
+    if reason:
+        suppressed.append({**row, "reason": reason})
+    else:
+        findings.append(row)
 
 
 def mask_ip(ip):
@@ -86,9 +104,9 @@ def canary_text():
     return "\n".join([
         "aws = " + "AKIA" + "ABCDEFGHIJKLMNOP",
         "key = '-----BEGIN " + "RSA PRIVATE KEY-----'",
-        "gh = " + "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8",
-        "lan = 192.168.77.10",
-        "mac = f4:5c:89:12:ab:cd",
+        "gh = " + "ghp_" + "a1B2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8",  # secretscan: allow canary
+        "lan = 192.168.77.10",  # secretscan: allow canary
+        "mac = f4:5c:89:12:ab:cd",  # secretscan: allow canary
     ])
 
 
@@ -128,22 +146,25 @@ def history_records(repo):
     return recs
 
 
-def scan_history(repo, workdir, findings, stats):
+def scan_history(repo, workdir, findings, suppressed, stats):
     recs = history_records(repo)
     stats["history_added_lines"] = len(recs)
     tmp = Path(workdir) / "history_added.txt"
     tmp.write_text("\n".join(r[3] for r in recs) + "\n")
+    hits = []
     for ds_type, line_no, fp in detect_secrets_scan(tmp):
-        commit, path, lineno, _ = recs[line_no - 1]
-        findings.append({"stage": "history", "rule": ds_type, "commit": commit,
-                         "file": path, "line": lineno, "fingerprint": fp})
+        commit, path, lineno, content = recs[line_no - 1]
+        hits.append(({"stage": "history", "rule": ds_type, "commit": commit, "file": path,
+                      "line": lineno, "fingerprint": fp}, content))
     for commit, path, lineno, content in recs:
         for kind, value, _ in policy_hits(content):
-            findings.append({"stage": "history", "rule": kind, "commit": commit,
-                             "file": path, "line": lineno, "value": value})
+            hits.append(({"stage": "history", "rule": kind, "commit": commit, "file": path,
+                          "line": lineno, "value": value}, content))
+    for row, content in hits:
+        _route(row, allow_reason(content), findings, suppressed)
 
 
-def scan_working(repo, findings, stats):
+def scan_working(repo, findings, suppressed, stats):
     files = subprocess.run(["git", "-C", str(repo), "ls-files", "-z"],
                            capture_output=True, text=True, check=True).stdout.split("\0")
     files = [f for f in files if f]
@@ -152,17 +173,19 @@ def scan_working(repo, findings, stats):
         p = Path(repo) / rel
         if not p.is_file():
             continue
-        for ds_type, line_no, fp in detect_secrets_scan(p):
-            findings.append({"stage": "working", "rule": ds_type, "file": rel,
-                             "line": line_no, "fingerprint": fp})
         try:
             lines = p.read_text().splitlines()
         except (UnicodeDecodeError, OSError):
             continue
+        hits = [(ds_type, line_no, {"fingerprint": fp})
+                for ds_type, line_no, fp in detect_secrets_scan(p)]
         for n, line in enumerate(lines, 1):
             for kind, value, _ in policy_hits(line):
-                findings.append({"stage": "working", "rule": kind, "file": rel,
-                                 "line": n, "value": value})
+                hits.append((kind, n, {"value": value}))
+        for rule, n, extra in hits:
+            reason = allow_reason(lines[n - 1]) if n - 1 < len(lines) else None
+            _route({"stage": "working", "rule": rule, "file": rel, "line": n, **extra},
+                   reason, findings, suppressed)
 
 
 def write_reports(outdir, report):
@@ -179,6 +202,11 @@ def write_reports(outdir, report):
           f"- findings: {len(report['findings'])}", "",
           "Secret values are never printed. Policy values are masked.", ""]
     md += rows if report["findings"] else ["No findings."]
+    if report["suppressed"]:
+        md += ["", "## Suppressed (reviewed exemptions)", "",
+               "| stage | rule | file | line | reason |", "|---|---|---|---|---|"]
+        md += [f"| {f['stage']} | {f['rule']} | {f['file']} | {f['line']} | {f['reason']} |"
+               for f in report["suppressed"]]
     (outdir / "report.md").write_text("\n".join(md) + "\n")
 
 
@@ -201,7 +229,8 @@ def main(argv=None):
     log.info("run %s repo=%s mode=%s detect-secrets=%s", run_id, repo, args.mode, ds_version)
 
     report = {"run_id": run_id, "repo": str(repo), "mode": args.mode,
-              "detect_secrets_version": ds_version, "findings": [], "stats": {}}
+              "detect_secrets_version": ds_version, "findings": [], "suppressed": [],
+              "stats": {}}
     started = time.monotonic()
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -217,10 +246,10 @@ def main(argv=None):
         try:
             if args.mode in ("working", "all"):
                 log.info("scanning working tree")
-                scan_working(repo, report["findings"], report["stats"])
+                scan_working(repo, report["findings"], report["suppressed"], report["stats"])
             if args.mode in ("history", "all"):
                 log.info("scanning git history")
-                scan_history(repo, tmp, report["findings"], report["stats"])
+                scan_history(repo, tmp, report["findings"], report["suppressed"], report["stats"])
         except subprocess.CalledProcessError as exc:
             log.error("git failed (exit %s) while scanning %s; is this a git repository?",
                       exc.returncode, repo)
@@ -231,6 +260,9 @@ def main(argv=None):
     for f in report["findings"]:
         log.warning("finding stage=%s rule=%s file=%s line=%s", f["stage"], f["rule"],
                     f["file"], f["line"])
+    for f in report["suppressed"]:
+        log.info("suppressed stage=%s rule=%s file=%s line=%s reason=%s",
+                 f["stage"], f["rule"], f["file"], f["line"], f["reason"])
     report["status"] = "findings" if report["findings"] else "clean"
     report["elapsed_seconds"] = round(time.monotonic() - started, 2)
     write_reports(outdir, report)
@@ -238,6 +270,7 @@ def main(argv=None):
     # Verify the artifacts we just wrote, so a silent write failure cannot pass as clean.
     readback = json.loads((outdir / "report.json").read_text())
     assert readback["status"] == report["status"]
+    assert len(readback["suppressed"]) == len(report["suppressed"])
     assert len(readback["findings"]) == len(report["findings"])
     assert (outdir / "report.md").stat().st_size > 0 and (outdir / "scan.log").stat().st_size > 0
     log.info("status=%s findings=%d report=%s", report["status"],
