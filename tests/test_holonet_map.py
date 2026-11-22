@@ -60,7 +60,7 @@ def test_parse_arp_keeps_subnet_and_drops_broadcast(agent):
         "? (192.0.2.9) at 2:00:00:00:00:1f on en0 ifscope [ethernet]\n"
         "router.example (192.0.2.1) at 2:0:0:0:0:1 on en0 ifscope [ethernet]\n"
         "? (192.0.2.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]\n"
-        "? (10.0.0.5) at 2:0:0:0:0:5 on en1 ifscope [ethernet]\n"
+        "? (198.51.100.5) at 2:0:0:0:0:5 on en1 ifscope [ethernet]\n"
     )
     out = agent.parse_arp(text, "192.0.2.0/24")
     assert set(out) == {"192.0.2.9", "192.0.2.1"}

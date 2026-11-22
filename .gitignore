@@ -12,3 +12,4 @@ inventory.json
 *.env
 known_hosts
 id_ed25519*
+reports/
