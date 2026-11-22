@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+.DS_Store
+# configuration and state live outside the repo; never commit them
+inventory.json
+*.env
+known_hosts
+id_ed25519*

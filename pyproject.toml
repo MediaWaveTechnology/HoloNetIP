@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "holonet"
+version = "0.2.0"
+description = "HoloNet: live 3D map and telemetry for the example LAN (ASUS RT-BE92U)"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9",
+    "asyncssh>=2.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.3"]
+
+[tool.setuptools]
+packages = ["holonet"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]

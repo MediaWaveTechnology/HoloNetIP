@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MWT Holo Network Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#03070d;--cy:#5ad1ff;--cy2:#7fe3ff;--tx:#cfe9f5;--mut:#6f8fa3;--line:#143247;--panel:rgba(6,16,26,.82);--g:#2fe08a;--y:#f2c230;--r:#ff4d5a;--off:#3a4753}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font-family:'JetBrains Mono',ui-monospace,monospace;overflow:hidden}
+#stage{position:fixed;inset:0}
+#gl{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl.grab{cursor:grabbing}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,0);text-align:center;font-size:11px;line-height:1.35;white-space:nowrap;text-shadow:0 0 6px #000,0 0 2px #000}
+.lbl b{font-weight:600;letter-spacing:.04em}
+.lbl .v{font-size:10.5px}
+.lbl.sel b{color:#fff}
+.hud{position:absolute;pointer-events:none;z-index:2}
+.hud *{pointer-events:auto}
+.brand{top:14px;left:16px}
+.brand h1{margin:0;font-family:Orbitron,sans-serif;font-size:15px;letter-spacing:.18em;color:var(--cy2);font-weight:700}
+.brand .sub{font-size:11px;color:var(--mut);margin-top:4px;letter-spacing:.06em}
+.badge{display:inline-block;font-size:10px;letter-spacing:.12em;padding:2px 7px;border:1px solid currentColor;border-radius:3px;margin-right:6px;vertical-align:1px}
+.b-live{color:var(--g)}.b-snap{color:var(--y)}.b-sim{color:var(--mut)}
+.thru{top:12px;right:16px;text-align:right}
+.thru .big{font-family:Orbitron,sans-serif;font-size:24px;color:#e8f6ff;font-weight:700;letter-spacing:.04em}
+.thru .sm{font-size:11px;color:var(--mut);margin-top:2px}
+.thru .big{display:flex;align-items:baseline;justify-content:flex-end;gap:8px}
+.thru .mid{font-family:Orbitron,sans-serif;font-size:16px;color:#e8f6ff;margin-top:2px;display:flex;align-items:baseline;justify-content:flex-end;gap:8px}
+.ar{font-size:.7em}.ar.dn{color:#5ad1ff}.ar.up{color:#c79bff}
+.meter{display:flex;gap:6px;justify-content:flex-end;align-items:center;margin-top:5px}
+.meter .ml{font-size:9px;color:var(--mut);letter-spacing:.1em;width:16px;text-align:right}
+.meter .mb{display:flex;gap:2px}
+.meter i{width:6px;height:9px;background:#0f2130;display:block}
+.plbl{position:absolute;transform:translate(-50%,-50%);font-size:10.5px;font-weight:600;color:#e8f6ff;white-space:nowrap;padding:1px 5px;border-radius:3px;background:rgba(3,10,18,.72);border:1px solid #143247;text-shadow:0 0 4px #000;font-variant-numeric:tabular-nums}
+.plbl i{font-style:normal;margin-right:3px}
+.plbl small{font-size:8.5px;color:var(--mut);margin-left:2px;font-weight:400}
+.rates{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.rate{background:rgba(10,30,45,.5);border:1px solid var(--line);border-radius:4px;padding:7px 9px;display:grid;grid-template-columns:auto 1fr;column-gap:6px;align-items:baseline}
+.rate .ar{font-size:12px}.rate.dn .ar{color:#5ad1ff}.rate.up .ar{color:#c79bff}
+.rate .lb{font-size:9px;letter-spacing:.16em;color:var(--mut)}
+.rate b{grid-column:1/3;font-family:Orbitron,sans-serif;font-size:16px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+.rate .pc{grid-column:1/3;font-size:10px;color:var(--mut)}
+.st{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:6px 0;border-top:1px solid var(--line);font-size:11px}
+.st:first-child{border-top:0}
+.st .nm{color:#e8f6ff;font-weight:600}.st .ag{color:var(--mut);font-size:9.5px;text-align:right}
+.st .vv{grid-column:1/3;font-family:Orbitron,sans-serif;font-size:13px;font-variant-numeric:tabular-nums}
+.st .vv .d{color:#5ad1ff}.st .vv .u{color:#c79bff}.st .er{grid-column:1/3;color:var(--r);font-size:10px}
+.sk{display:flex;gap:12px;font-size:10px;color:var(--mut);margin-top:4px;flex-wrap:wrap}
+.sk i{display:inline-block;width:14px;height:0;border-top:2px solid #5ad1ff;vertical-align:middle;margin-right:4px}
+.sk i.ku{border-top:2px dashed #c79bff}
+.side{top:84px;left:16px;width:228px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:10px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.card h3{margin:0 0 8px;font-family:Orbitron,sans-serif;font-size:10px;letter-spacing:.2em;color:var(--cy);font-weight:500}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.stat .n{font-family:Orbitron,sans-serif;font-size:18px;color:#e8f6ff}
+.stat .k{font-size:9.5px;color:var(--mut);letter-spacing:.1em}
+.nbar{pointer-events:auto;top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 10px;font-size:10.5px;letter-spacing:.08em;cursor:pointer;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);user-select:none;color:var(--tx);font-family:inherit}
+.nbar:hover,.nbar:focus-visible{border-color:var(--cy);outline:none}
+.nbar .t{font-family:Orbitron,sans-serif;font-size:9.5px;letter-spacing:.2em;color:var(--cy)}
+.nbar .c{display:inline-flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+.nbar .c .dot{margin-top:0}
+.nbar .c.zero{opacity:.35}
+.nbar .chev{color:var(--mut);transition:transform .2s}
+.nbar[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.nbar.flash{animation:nflash 1.2s ease-out 2}
+@keyframes nflash{0%{box-shadow:0 0 0 0 rgba(255,77,90,.7)}100%{box-shadow:0 0 0 14px rgba(255,77,90,0)}}
+.adrop{pointer-events:auto;top:48px;left:50%;transform:translateX(-50%);width:320px;max-height:calc(100vh - 120px);display:flex;flex-direction:column;margin:0;z-index:4}
+.adrop[hidden]{display:none}
+.adrop h3{display:flex;justify-content:space-between;align-items:center}
+.adrop h3 .cnt{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--mut);letter-spacing:.04em}
+#alerts{overflow:auto;min-height:0}
+.alert{display:flex;gap:8px;align-items:flex-start;font-size:11px;padding:6px 0;border-top:1px solid var(--line);cursor:pointer;line-height:1.4}
+.alert:first-of-type{border-top:0}
+.alert:hover{color:#fff}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:4px}
+.sev-high{background:var(--r);box-shadow:0 0 8px var(--r)}
+.sev-med{background:var(--y)}
+.sev-info{background:var(--cy)}
+.legend{bottom:12px;left:16px;right:16px;display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;color:var(--mut);pointer-events:none}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.iconsw{display:inline-flex;margin-top:8px;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--panel);font-size:9.5px;letter-spacing:.12em}
+.iconsw .lb{padding:4px 7px;color:var(--mut);border-right:1px solid var(--line)}
+.iconsw button{background:none;border:0;color:var(--mut);font:inherit;letter-spacing:inherit;padding:4px 8px;cursor:pointer}
+.iconsw button:hover{color:#fff}
+.iconsw button[aria-pressed="true"]{background:rgba(90,209,255,.14);color:var(--cy2)}
+.iconsw button:focus-visible{outline:1px solid var(--cy);outline-offset:-1px}
+.hint{bottom:12px;right:16px;font-size:10.5px;color:var(--mut);pointer-events:none;text-align:right}
+#panel{position:absolute;top:128px;right:16px;width:320px;max-height:calc(100% - 172px);overflow:auto;z-index:3;transform:translateX(360px);opacity:0;transition:transform .35s cubic-bezier(.2,.8,.2,1),opacity .25s}
+#panel.open{transform:none;opacity:1}
+#panel .card{margin:0;padding:14px 16px;border-color:#1d4a66}
+.ph{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ph h2{margin:0;font-family:Orbitron,sans-serif;font-size:15px;letter-spacing:.08em;color:#fff;font-weight:700;word-break:break-all}
+.ph .kind{font-size:11px;color:var(--mut);margin-top:3px}
+.x{background:none;border:1px solid var(--line);color:var(--tx);width:28px;height:28px;border-radius:4px;cursor:pointer;font:inherit;flex:none}
+.x:hover{border-color:var(--cy)}
+.state{margin:10px 0 4px;font-size:11px;letter-spacing:.14em}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:4px 10px;font-size:11.5px;margin-top:10px}
+.kv dt{color:var(--mut)}.kv dd{margin:0;word-break:break-all}
+.sec{margin-top:14px}
+.sec h4{margin:0 0 6px;font-size:9.5px;letter-spacing:.2em;color:var(--cy);font-weight:600}
+table.ports{width:100%;border-collapse:collapse;font-size:11px}
+table.ports td{padding:4px 0;border-top:1px solid var(--line);vertical-align:top}
+table.ports td:first-child{color:var(--cy2);width:64px}
+.find{font-size:11px;padding:6px 8px;border-left:2px solid var(--y);background:rgba(242,194,48,.06);margin-bottom:6px;line-height:1.45}
+.find.high{border-color:var(--r);background:rgba(255,77,90,.08)}
+.find.info{border-color:var(--cy);background:rgba(90,209,255,.05)}
+#spark{width:100%;height:70px;display:block;margin-top:4px}
+.btns{display:flex;gap:8px;margin-top:14px}
+.btn{background:transparent;border:1px solid #1d4a66;color:var(--tx);font:inherit;font-size:11px;padding:7px 10px;border-radius:4px;cursor:pointer;letter-spacing:.06em}
+.btn:hover{border-color:var(--cy);color:#fff}
+.muted{color:var(--mut)}
+#err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--mut)}
+@media (max-width:760px){
+ .side{display:none}
+ .nbar{top:68px;left:16px;transform:none}
+ .adrop{top:102px;left:12px;right:12px;width:auto;transform:none}
+ .nbar .t{display:none}
+ .brand h1{font-size:12px}
+ #net,#scanAt{display:none}
+ .thru .sm{font-size:9.5px}
+ .thru .big{font-size:18px}
+ #panel{top:auto;bottom:0;left:0;right:0;width:auto;max-height:58%;transform:translateY(110%)}
+ #panel.open{transform:none}
+ #panel .card{border-radius:12px 12px 0 0}
+ .legend{bottom:10px;gap:10px;font-size:10px}
+ .hint{display:none}
+}
+</style>
+</head>
+<body>
+<div id="stage">
+ <canvas id="gl"></canvas>
+ <div id="labels"></div>
+
+ <div class="hud brand">
+  <h1>MWT // HOLO NET</h1>
+  <div class="sub"><span id="srcBadge" class="badge b-snap">SNAPSHOT</span><span id="net">192.0.2.0/24</span></div>
+  <div class="sub" id="scanAt">scan --</div>
+ </div>
+
+ <button class="hud nbar" id="nbar" type="button" aria-controls="alerts" aria-expanded="false" title="Show or hide alerts">
+  <span class="t">ALERTS</span>
+  <span class="c" id="nHigh"><i class="dot sev-high"></i><b>0</b></span>
+  <span class="c" id="nMed"><i class="dot sev-med"></i><b>0</b></span>
+  <span class="c" id="nInfo"><i class="dot sev-info"></i><b>0</b></span>
+  <span class="chev">▾</span>
+ </button>
+ <div class="hud card adrop" id="alertDrop" role="region" aria-label="Alerts" hidden>
+  <h3>ALERTS <span class="cnt"><span id="alertCnt">0</span> total</span></h3>
+  <div id="alerts"></div>
+ </div>
+
+ <div class="hud thru">
+  <div class="big"><span class="ar dn">▼</span><span id="totDn">-- Mbps</span></div>
+  <div class="mid"><span class="ar up">▲</span><span id="totUp">-- Mbps</span></div>
+  <div class="sm"><span id="simBadge" class="badge b-sim">TRAFFIC SIMULATED</span><span id="wanPct">WAN --</span></div>
+  <div class="meter"><span class="ml">DN</span><span class="mb" id="meterDn"></span></div>
+  <div class="meter"><span class="ml">UP</span><span class="mb" id="meterUp"></span></div>
+  <div class="iconsw" role="group" aria-label="Icon set"><span class="lb">ICONS</span><button type="button" data-set="abstract" aria-pressed="true">ABSTRACT</button><button type="button" data-set="device" aria-pressed="false">DEVICE</button></div>
+ </div>
+
+ <div class="hud side">
+  <div class="card">
+   <h3>DEVICES</h3>
+   <div class="stats">
+    <div class="stat"><div class="n" id="nOn" style="color:var(--g)">-</div><div class="k">ONLINE</div></div>
+    <div class="stat"><div class="n" id="nOff">-</div><div class="k">ASLEEP</div></div>
+    <div class="stat"><div class="n" id="nUnk" style="color:var(--r)">-</div><div class="k">UNKNOWN</div></div>
+   </div>
+  </div>
+  <div class="card" id="stCard" style="display:none">
+   <h3>SPEED TESTS</h3>
+   <div id="stList"></div>
+   <div class="muted" id="stMeta" style="font-size:9.5px;margin-top:6px;line-height:1.4"></div>
+  </div>
+ </div>
+
+ <div id="panel" role="dialog" aria-label="Device details"><div class="card" id="pcard"></div></div>
+
+ <div class="hud legend">
+  <span><i class="dot" style="background:var(--g)"></i>&lt;60% load</span>
+  <span><i class="dot" style="background:var(--y)"></i>60-85%</span>
+  <span><i class="dot" style="background:var(--r)"></i>&gt;85% / unknown device</span>
+  <span><i class="dot" style="background:var(--off)"></i>asleep</span>
+  <span><b style="color:#5ad1ff">▼</b> downlink · <b style="color:#c79bff">▲</b> uplink · particles show direction</span>
+ </div>
+ <div class="hud hint">drag to orbit · scroll to zoom · click a node</div>
+ <div id="err">WebGL isn't available in this browser, so the 3D map can't render.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+
+<script id="snapshot" type="application/json">
+{
+ "source": "snapshot",
+ "network": "192.0.2.0/24",
+ "scanned_at": "2026-01-01T00:00:00+00:00",
+ "scanner": "example fixture (not a real scan)",
+ "devices": [
+  {
+   "ip": "192.0.2.1",
+   "hostname": "router",
+   "label": "ROUTER",
+   "model": "Example Router",
+   "kind": "router",
+   "mac": "02:00:00:00:00:01",
+   "vendor": "Example",
+   "status": "online",
+   "approved": true,
+   "ports": [
+    {
+     "port": 53,
+     "service": "domain",
+     "version": "DNS"
+    },
+    {
+     "port": 80,
+     "service": "http",
+     "version": "web admin"
+    }
+   ]
+  },
+  {
+   "ip": "192.0.2.20",
+   "hostname": "speaker-a",
+   "label": "SPEAKER A",
+   "model": "Example speaker",
+   "kind": "audio",
+   "mac": "02:00:00:00:00:02",
+   "vendor": "Example",
+   "status": "online",
+   "approved": true,
+   "ports": [
+    {
+     "port": 80,
+     "service": "http",
+     "version": "Web interface"
+    }
+   ]
+  },
+  {
+   "ip": "192.0.2.21",
+   "hostname": "tv-a",
+   "label": "TV A",
+   "model": "Example TV",
+   "kind": "media",
+   "mac": "02:00:00:00:00:03",
+   "vendor": "",
+   "status": "asleep",
+   "approved": true,
+   "ports": []
+  },
+  {
+   "ip": "192.0.2.22",
+   "hostname": "server-a",
+   "label": "SERVER A",
+   "model": "Example server",
+   "kind": "server",
+   "mac": "02:00:00:00:00:04",
+   "vendor": "Example",
+   "status": "online",
+   "approved": true,
+   "ports": [
+    {
+     "port": 22,
+     "service": "ssh",
+     "version": "OpenSSH"
+    },
+    {
+     "port": 445,
+     "service": "smb",
+     "version": "SMB file sharing"
+    }
+   ]
+  },
+  {
+   "ip": "192.0.2.23",
+   "hostname": "laptop-a",
+   "label": "LAPTOP A",
+   "model": "Example laptop",
+   "kind": "laptop",
+   "mac": "02:00:00:00:00:05",
+   "vendor": "Example",
+   "status": "asleep",
+   "approved": true,
+   "ports": []
+  },
+  {
+   "ip": "192.0.2.24",
+   "hostname": "phone-a",
+   "label": "PHONE A",
+   "model": "Example phone",
+   "kind": "phone",
+   "mac": "02:00:00:00:00:06",
+   "vendor": "",
+   "status": "asleep",
+   "approved": true,
+   "ports": []
+  },
+  {
+   "ip": "192.0.2.99",
+   "hostname": "",
+   "label": "UNKNOWN .99",
+   "model": "Unidentified",
+   "kind": "unknown",
+   "mac": "02:00:00:00:00:99",
+   "vendor": "",
+   "status": "asleep",
+   "approved": false,
+   "ports": []
+  }
+ ],
+ "findings": [
+  {
+   "ip": "192.0.2.99",
+   "severity": "high",
+   "title": "Unknown device",
+   "detail": "No hostname and not in the approved inventory."
+  },
+  {
+   "ip": "192.0.2.22",
+   "severity": "info",
+   "title": "SMB open (445/tcp)",
+   "detail": "File sharing is on. Keep it on the LAN."
+  }
+ ]
+}
+</script>
+
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const C=$('gl'),LB=$('labels');
+let R;
+try{R=new THREE.WebGLRenderer({canvas:C,antialias:true,powerPreference:'high-performance'});}catch(e){$('err').style.display='flex';return;}
+R.setPixelRatio(Math.min(devicePixelRatio,2));
+R.setClearColor(0x03070d,1);
+R.toneMapping=THREE.NoToneMapping;
+
+const S=new THREE.Scene();
+S.fog=new THREE.FogExp2(0x03070d,0.034);
+const cam=new THREE.PerspectiveCamera(50,1,0.1,200);
+cam.position.set(13,10,15);
+const ctl=new THREE.OrbitControls(cam,C);
+ctl.enableDamping=true;ctl.dampingFactor=.07;ctl.target.set(0,2.6,0);
+ctl.minDistance=6;ctl.maxDistance=34;ctl.maxPolarAngle=Math.PI*0.49;ctl.minPolarAngle=0.2;
+ctl.autoRotate=true;ctl.autoRotateSpeed=0.35;ctl.enablePan=false;
+let idleT=0;ctl.addEventListener('start',()=>{ctl.autoRotate=false;idleT=0;C.classList.add('grab')});
+ctl.addEventListener('end',()=>{C.classList.remove('grab')});
+
+const comp=new THREE.EffectComposer(R);
+comp.addPass(new THREE.RenderPass(S,cam));
+const bloom=new THREE.UnrealBloomPass(new THREE.Vector2(512,512),0.75,0.35,0.42);
+comp.addPass(bloom);
+
+const COL={g:0x2fe08a,y:0xf2c230,r:0xff4d5a,cy:0x5ad1ff,off:0x34424f,white:0xe8f6ff};
+const hex=c=>'#'+c.toString(16).padStart(6,'0');
+
+/* ---------- environment ---------- */
+const grid=new THREE.GridHelper(80,80,0x0f3a52,0x0a2233);grid.material.transparent=true;grid.material.opacity=.55;S.add(grid);
+const grid2=new THREE.GridHelper(80,16,0x1f6f94,0x1f6f94);grid2.material.transparent=true;grid2.material.opacity=.28;grid2.position.y=.005;S.add(grid2);
+const floor=new THREE.Mesh(new THREE.CircleGeometry(40,64),new THREE.MeshBasicMaterial({color:0x020509,transparent:true,opacity:.6}));floor.rotation.x=-Math.PI/2;floor.position.y=-.01;S.add(floor);
+const sweep=new THREE.Mesh(new THREE.RingGeometry(.96,1,96),new THREE.MeshBasicMaterial({color:COL.cy,transparent:true,opacity:.5,side:THREE.DoubleSide,depthWrite:false}));sweep.rotation.x=-Math.PI/2;sweep.position.y=.02;S.add(sweep);
+const bounds=new THREE.Mesh(new THREE.RingGeometry(10.9,11,128),new THREE.MeshBasicMaterial({color:COL.cy,transparent:true,opacity:.25,side:THREE.DoubleSide}));bounds.rotation.x=-Math.PI/2;bounds.position.y=.015;S.add(bounds);
+(function dust(){const n=500,p=new Float32Array(n*3);for(let i=0;i<n;i++){p[i*3]=(Math.random()-.5)*40;p[i*3+1]=Math.random()*14;p[i*3+2]=(Math.random()-.5)*40}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(p,3));
+ const m=new THREE.PointsMaterial({color:0x2a7fa8,size:.05,transparent:true,opacity:.7,depthWrite:false});S.add(new THREE.Points(g,m))})();
+
+function glowTex(){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.25,'rgba(255,255,255,.5)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c)}
+const GT=glowTex();
+
+/* ---------- geometry per device kind ---------- */
+/* Icon set 2 ("device"): low-poly device silhouettes, merged into one geometry per node so
+   colouring, picking and disposal work exactly like the abstract set. */
+let ICONSET='abstract';
+try{if(localStorage.getItem('holonet.iconSet')==='device')ICONSET='device'}catch(_){}
+const _q=new THREE.Quaternion(),_e=new THREE.Euler();
+function M(x,y,z,rx,ry,rz){return new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),_q.setFromEuler(_e.set(rx||0,ry||0,rz||0)),new THREE.Vector3(1,1,1))}
+function merge(parts){
+ const arrs=parts.map(([g,m])=>{const n=(g.index?g.toNonIndexed():g.clone());n.applyMatrix4(m);const a=n.attributes.position.array;n.dispose();g.dispose();return a});
+ const out=new Float32Array(arrs.reduce((t,a)=>t+a.length,0));let o=0;arrs.forEach(a=>{out.set(a,o);o+=a.length});
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(out,3));g.computeVertexNormals();g.computeBoundingSphere();return g;
+}
+const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d),Cy=(rt,rb,h,s)=>new THREE.CylinderGeometry(rt,rb,h,s||16);
+function deviceGeo(kind,r){switch(kind){
+ case 'cloud':return merge([[new THREE.SphereGeometry(r*.62,16,12),M(0,0,0)],[new THREE.SphereGeometry(r*.5,16,12),M(-r*.62,-r*.12,0)],[new THREE.SphereGeometry(r*.48,16,12),M(r*.62,-r*.14,0)],[new THREE.SphereGeometry(r*.4,16,12),M(r*.2,r*.38,r*.1)]]);
+ case 'router':{const a=[[B(r*2,r*.42,r*1.25),M(0,0,0)]];[-.75,-.25,.25,.75].forEach((x,i)=>a.push([Cy(r*.05,r*.07,r*1.15,8),M(x*r,r*.66,-r*.5,-.18,0,(i<2?1:-1)*.22)]));a.push([B(r*1.4,r*.05,r*.04),M(0,0,r*.64)]);return merge(a)}
+ case 'server':return merge([[B(r*1.7,r*.42,r*1.4),M(0,-r*.5,0)],[B(r*1.7,r*.42,r*1.4),M(0,0,0)],[B(r*1.7,r*.42,r*1.4),M(0,r*.5,0)],[B(r*.9,r*.05,r*.04),M(-r*.25,-r*.5,r*.72)],[B(r*.9,r*.05,r*.04),M(-r*.25,0,r*.72)],[B(r*.9,r*.05,r*.04),M(-r*.25,r*.5,r*.72)]]);
+ case 'laptop':return merge([[B(r*1.9,r*.09,r*1.25),M(0,-r*.35,0)],[B(r*1.9,r*1.2,r*.07),M(0,r*.22,-r*.72,-.28,0,0)]]);
+ case 'phone':return merge([[B(r*.85,r*1.65,r*.14),M(0,0,0)],[B(r*.3,r*.06,r*.04),M(0,r*.7,r*.08)],[Cy(r*.09,r*.09,r*.04,12),M(0,-r*.68,r*.08,Math.PI/2,0,0)]]);
+ case 'audio':return merge([[B(r*1.05,r*1.7,r*.9),M(0,0,0)],[Cy(r*.36,r*.36,r*.1,20),M(0,-r*.3,r*.46,Math.PI/2,0,0)],[Cy(r*.17,r*.17,r*.1,16),M(0,r*.45,r*.46,Math.PI/2,0,0)]]);
+ case 'media':return merge([[B(r*2.1,r*1.25,r*.08),M(0,r*.3,0)],[Cy(r*.05,r*.05,r*.5,8),M(0,-r*.55,0)],[Cy(r*.42,r*.42,r*.05,20),M(0,-r*.8,0)]]);
+ default:return merge([[new THREE.OctahedronGeometry(r*.85,0),M(0,r*.25,0)],[Cy(r*.12,r*.12,r*.12,10),M(0,-r*.95,0)]]);
+}}
+function iconGeo(kind,r){return ICONSET==='device'?deviceGeo(kind,r):geoFor(kind,r)}
+function setIconSet(v){
+ ICONSET=v==='device'?'device':'abstract';
+ try{localStorage.setItem('holonet.iconSet',ICONSET)}catch(_){}
+ document.querySelectorAll('.iconsw button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===ICONSET?'true':'false'));
+ if(data){topoKey='';const keep=sel;build(data);if(keep&&nodes.has(keep)){sel=keep;renderPanel()}tick()}
+}
+document.querySelectorAll('.iconsw button').forEach(b=>b.addEventListener('click',()=>setIconSet(b.dataset.set)));
+document.querySelectorAll('.iconsw button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.set===ICONSET?'true':'false'));
+
+function geoFor(kind,r){switch(kind){
+ case 'cloud':return new THREE.IcosahedronGeometry(r,1);
+ case 'router':return new THREE.OctahedronGeometry(r,0);
+ case 'server':return new THREE.BoxGeometry(r*1.5,r*1.5,r*1.5);
+ case 'laptop':return new THREE.DodecahedronGeometry(r,0);
+ case 'audio':return new THREE.CylinderGeometry(r*.8,r*.8,r*1.5,16);
+ case 'phone':return new THREE.BoxGeometry(r*.8,r*1.6,r*.3);
+ case 'media':return new THREE.TorusGeometry(r*.75,r*.28,10,24);
+ default:return new THREE.TetrahedronGeometry(r*1.2,0);}}
+const KIND_NAME={router:'Gateway router',server:'Server',laptop:'Computer',audio:'Audio device',phone:'Phone',media:'Media / IoT',unknown:'Unidentified device',cloud:'Internet'};
+
+/* ---------- state ---------- */
+let data=null,nodes=new Map(),links=[],sel=null,topoKey='';
+const objs=[];
+function track(o){S.add(o);objs.push(o);return o}
+function clearScene(){objs.forEach(o=>{S.remove(o);o.traverse(c=>{c.geometry&&c.geometry.dispose();c.material&&c.material.dispose()})});objs.length=0;LB.innerHTML='';nodes.clear();links=[]}
+
+function hash(s){let h=2166136261;for(const ch of s){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)}return (h>>>0)/4294967295}
+function devKey(d){return d.mac||d.ip}
+
+function layout(devs){
+ const gw=devs.find(d=>d.kind==='router');
+ const rest=devs.filter(d=>d!==gw);
+ const on=rest.filter(d=>d.status==='online'),off=rest.filter(d=>d.status!=='online');
+ on.sort((a,b)=>ipn(a.ip)-ipn(b.ip));off.sort((a,b)=>ipn(a.ip)-ipn(b.ip));
+ const pos=new Map();
+ if(gw)pos.set(devKey(gw),new THREE.Vector3(0,3.8,0));
+ on.forEach((d,i)=>{const a=(i/Math.max(on.length,1))*Math.PI*2+.4;const h=1.7+hash(d.ip)*1.6;pos.set(devKey(d),new THREE.Vector3(Math.cos(a)*5.8,h,Math.sin(a)*5.8))});
+ off.forEach((d,i)=>{const a=(i/Math.max(off.length,1))*Math.PI*2+.15;const r=8.6+hash(d.ip+'r')*1.2;pos.set(devKey(d),new THREE.Vector3(Math.cos(a)*r,.75+hash(d.ip)*.5,Math.sin(a)*r))});
+ return pos;
+}
+function ipn(ip){return ip.split('.').reduce((a,b)=>a*256+(+b),0)}
+
+/* per-direction capacity: inventory caps win, then sensible defaults per device type */
+function caps(d){
+ const both=d.cap_mbps||({server:1000,router:1000,laptop:600,audio:100,phone:400}[d.kind]||300);
+ return {dn:d.cap_down_mbps||both,up:d.cap_up_mbps||both};
+}
+
+function makeNode(id,d,p,r){
+ const isUnk=!d.approved, live=d.status==='online';
+ const col=d.kind==='cloud'||d.kind==='router'?COL.cy:isUnk?COL.r:live?COL.g:COL.off;
+ const c=caps(d);
+ const n={id,d,v:p.clone(),r,col,dn:0,up:0,shDn:0,shUp:0,capDn:c.dn,capUp:c.up,uDn:0,uUp:0,u:0,hDn:[],hUp:[]};
+ n.core=track(new THREE.Mesh(iconGeo(d.kind,r),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:live||isUnk||d.kind==='cloud'?1:.45})));n.core.position.copy(p);
+ if(ICONSET==='device'){n.core.add(new THREE.LineSegments(new THREE.EdgesGeometry(n.core.geometry,25),new THREE.LineBasicMaterial({color:0xe8f6ff,transparent:true,opacity:live||isUnk||d.kind==='cloud'?.55:.22})))}
+ n.wire=track(new THREE.Mesh(new THREE.IcosahedronGeometry(r*1.75,1),new THREE.MeshBasicMaterial({color:col,wireframe:true,transparent:true,opacity:live?.16:.08})));n.wire.position.copy(p);
+ n.halo=track(new THREE.Sprite(new THREE.SpriteMaterial({map:GT,color:col,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false,opacity:live||d.kind==='cloud'?.85:isUnk?.6:.12})));n.halo.position.copy(p);n.halo.scale.setScalar(r*6);
+ if(d.kind!=='cloud'){
+  const tg=new THREE.BufferGeometry().setFromPoints([p,new THREE.Vector3(p.x,0,p.z)]);
+  n.teth=track(new THREE.Line(tg,new THREE.LineDashedMaterial({color:col,dashSize:.12,gapSize:.14,transparent:true,opacity:live?.45:.2})));n.teth.computeLineDistances();
+  n.ring=track(new THREE.Mesh(new THREE.RingGeometry(r*1.25,r*1.5,48),new THREE.MeshBasicMaterial({color:col,side:THREE.DoubleSide,transparent:true,opacity:live?.7:.3,depthWrite:false})));n.ring.rotation.x=-Math.PI/2;n.ring.position.set(p.x,.03,p.z);
+ }
+ if(isUnk){n.warn=track(new THREE.Mesh(new THREE.RingGeometry(r*2.2,r*2.35,6),new THREE.MeshBasicMaterial({color:COL.r,side:THREE.DoubleSide,transparent:true,opacity:.9,depthWrite:false})));n.warn.position.copy(p);}
+ n.hit=track(new THREE.Mesh(new THREE.SphereGeometry(Math.max(r*2.2,.7),8,6),new THREE.MeshBasicMaterial({visible:false})));n.hit.position.copy(p);n.hit.userData.id=id;
+ const el=document.createElement('div');el.className='lbl';LB.appendChild(el);n.lab=el;
+ nodes.set(id,n);return n;
+}
+
+/* One lane of a link. Particles run from P0 to P2: downlink lanes start at the parent, uplink lanes at the child. */
+function lane(P0,P2,side,lift,dir){
+ const A=P0.clone().add(side),B=P2.clone().add(side);
+ const mid=A.clone().add(B).multiplyScalar(.5).add(side.clone().multiplyScalar(1.4));mid.y+=lift;
+ const cv=new THREE.QuadraticBezierCurve3(A,mid,B);
+ const ln=track(new THREE.Line(new THREE.BufferGeometry().setFromPoints(cv.getPoints(64)),new THREE.LineBasicMaterial({color:COL.g,transparent:true,opacity:.5})));
+ const ps=[];const N=8;
+ for(let i=0;i<N;i++){const s=track(new THREE.Sprite(new THREE.SpriteMaterial({map:GT,color:COL.g,blending:THREE.AdditiveBlending,transparent:true,depthWrite:false})));s.scale.setScalar(dir==='dn'?.3:.24);ps.push({s,t:i/N})}
+ const head=track(new THREE.Mesh(new THREE.ConeGeometry(.07,.2,8),new THREE.MeshBasicMaterial({color:COL.g,transparent:true,opacity:.9})));
+ const el=document.createElement('div');el.className='plbl '+dir;LB.appendChild(el);
+ return {cv,ln,ps,head,lab:el,dir,u:0,col:COL.g};
+}
+
+/* parent -> child. `rate` is the node whose down/up numbers drive this link (the child; the router for WAN). */
+function makeLink(parent,child,rate){
+ const A=parent.v,B=child.v,dirv=B.clone().sub(A);
+ const live=child.d.status==='online'||child.d.kind==='router'||child.id==='__cloud';
+ const unk=!child.d.approved;
+ if(!live){
+  const mid=A.clone().add(B).multiplyScalar(.5);mid.y+=dirv.length()*.18;
+  const cv=new THREE.QuadraticBezierCurve3(A,mid,B);
+  const ln=track(new THREE.Line(new THREE.BufferGeometry().setFromPoints(cv.getPoints(64)),new THREE.LineDashedMaterial({color:unk?COL.r:COL.off,dashSize:.18,gapSize:.22,transparent:true,opacity:unk?.55:.35})));ln.computeLineDistances();
+  links.push({live:false,rate,child,ln});return;
+ }
+ let side=new THREE.Vector3().crossVectors(dirv,new THREE.Vector3(0,1,0));
+ if(side.lengthSq()<1e-6)side.set(1,0,0);
+ side.normalize().multiplyScalar(child.id==='__cloud'?.26:.17);
+ const lift=dirv.length()*.16;
+ const dn=lane(A,B,side,lift,'dn');                         // download: parent -> child
+ const up=lane(B,A,side.clone().negate(),lift,'up');        // upload: child -> parent
+ links.push({live:true,rate,child,unk,dn,up});
+}
+
+function build(d){
+ clearScene();
+ const pos=layout(d.devices);
+ const cloud=makeNode('__cloud',{kind:'cloud',label:'INTERNET',status:'online',approved:true,ip:'WAN'},new THREE.Vector3(0,8.6,0),.62);
+ let gw=null;
+ d.devices.forEach(dev=>{const r=dev.kind==='router'?.55:dev.status==='online'?.34:.26;const n=makeNode(devKey(dev),dev,pos.get(devKey(dev)),r);if(dev.kind==='router')gw=n});
+ if(gw){
+  const w=d.wan||{};gw.capDn=w.down_mbps||1000;gw.capUp=w.up_mbps||1000;
+  makeLink(cloud,gw,gw);                                   // WAN: internet -> router is download
+  nodes.forEach(n=>{if(n!==gw&&n!==cloud)makeLink(gw,n,n)});
+ }
+ if(sel&&!nodes.has(sel))closePanel();
+}
+
+/* ---------- data ingest ---------- */
+function apply(d){
+ data=d;
+ const key=d.devices.map(x=>devKey(x)+':'+x.status+':'+(x.approved?1:0)).sort().join('|');
+ if(key!==topoKey){topoKey=key;build(d)}
+ else d.devices.forEach(x=>{const n=nodes.get(devKey(x));if(n)n.d=x});
+ const gw=[...nodes.values()].find(n=>n.d.kind==='router');
+ if(gw&&d.wan){gw.capDn=d.wan.down_mbps||gw.capDn;gw.capUp=d.wan.up_mbps||gw.capUp}
+ $('srcBadge').textContent=d.source==='live'?'LIVE':'SNAPSHOT';
+ $('srcBadge').className='badge '+(d.source==='live'?'b-live':'b-snap');
+ $('net').textContent=d.network||'';
+ $('scanAt').textContent='scan '+fmtDate(d.scanned_at)+(d.source==='live'?'':' · Sept 22 inventory');
+ const on=d.devices.filter(x=>x.status==='online').length,unk=d.devices.filter(x=>!x.approved).length;
+ $('nOn').textContent=on;$('nOff').textContent=d.devices.length-on;$('nUnk').textContent=unk;
+ const al=$('alerts');al.innerHTML='';
+ const order={high:0,med:1,info:2};
+ (d.findings||[]).slice().sort((a,b)=>order[a.severity]-order[b.severity]).forEach(f=>{
+  const row=document.createElement('div');row.className='alert';
+  row.innerHTML='<i class="dot sev-'+f.severity+'"></i><div><div>'+esc(f.title)+'</div><div class="muted">'+esc(f.ip)+'</div></div>';
+  row.onclick=()=>{const dv=d.devices.find(x=>x.ip===f.ip);if(dv){if(innerWidth<760)setAlertsOpen(false);select(devKey(dv))}};al.appendChild(row)});
+ if(!al.children.length)al.innerHTML='<div class="muted" style="font-size:11px">No findings</div>';
+ alertSummary(d.findings||[]);
+ renderSpeed(d);
+ if(d.source==='live')tick();
+ if(sel)renderPanel();
+}
+/* ---------- alerts: collapsible card + top notification bar ---------- */
+let lastHigh=null;
+function alertSummary(fs){
+ const n={high:0,med:0,info:0};fs.forEach(f=>{if(f.severity in n)n[f.severity]++});
+ [['nHigh','high'],['nMed','med'],['nInfo','info']].forEach(([id,k])=>{const el=$(id);el.querySelector('b').textContent=n[k];el.classList.toggle('zero',!n[k])});
+ $('alertCnt').textContent=fs.length;
+ $('nbar').setAttribute('aria-label','Alerts: '+n.high+' high, '+n.med+' medium, '+n.info+' info. Toggle list.');
+ if(lastHigh!==null&&n.high>lastHigh){const b=$('nbar');b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash')}
+ lastHigh=n.high;
+}
+function setAlertsOpen(open){
+ $('alertDrop').hidden=!open;
+ $('nbar').setAttribute('aria-expanded',open?'true':'false');
+ try{localStorage.setItem('holonet.alertsOpen',open?'1':'0')}catch(_){}
+}
+function toggleAlerts(){setAlertsOpen($('alertDrop').hidden)}
+$('nbar').addEventListener('click',toggleAlerts);
+addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('alertDrop').hidden)setAlertsOpen(false)});
+(function(){let open=false;try{open=localStorage.getItem('holonet.alertsOpen')==='1'}catch(_){}setAlertsOpen(open&&innerWidth>=760)})();
+
+function ago(iso){if(!iso)return 'never';const s=(Date.now()-new Date(iso))/1000;if(isNaN(s))return '--';
+ return s<90?Math.round(s)+'s ago':s<5400?Math.round(s/60)+'m ago':s<172800?Math.round(s/3600)+'h ago':Math.round(s/86400)+'d ago'}
+function renderSpeed(d){
+ const b=d.backend,st=b&&b.speedtests;
+ if(!st||!st.streams){$('stCard').style.display=d.source==='live'?'block':'none';
+  if(d.source==='live'){$('stList').innerHTML='<div class="muted" style="font-size:11px">Backend '+esc(b?b.status:'not connected')+'</div>';$('stMeta').textContent=b&&b.error?b.error:''}
+  return}
+ $('stCard').style.display='block';
+ const f=v=>v==null?'--':(v>=100?Math.round(v):(+v).toFixed(1));
+ $('stList').innerHTML=st.streams.map(x=>'<div class="st"><span class="nm">'+esc(x.label)+'</span><span class="ag">'+esc(ago(x.measured_at))+'</span>'
+  +'<span class="vv"><span class="d">▼'+f(x.down_mbps)+'</span> <span class="u">▲'+(x.up_mbps==null?'n/a':f(x.up_mbps))+'</span> <small class="muted">Mbps'+(x.ping_ms!=null?' · '+f(x.ping_ms)+' ms':'')+'</small></span>'
+  +(x.error?'<span class="er">'+esc(x.error)+'</span>':'')+'</div>').join('');
+ const h=st.host||{};
+ $('stMeta').innerHTML=(st.running?'<b style="color:var(--y)">Test running now: WAN numbers include test traffic</b><br>':'')
+  +'Run from '+esc(h.host||'?')+' ('+esc(h.link||'?')+'). Next '+(st.next_run_at?esc(fmtDate(st.next_run_at)):'--')
+  +'. Router sampler: '+esc(b.status||'?')+(b.sampled_at?' · '+esc(ago(b.sampled_at)):'');
+}
+function fmtDate(s){if(!s)return '--';const t=new Date(s);if(isNaN(t))return s;return t.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+/* ---------- traffic: separate downlink / uplink per device ---------- */
+function feed(d){
+ if(d.traffic&&typeof d.traffic==='object'){
+  if(d.traffic.down==null&&d.traffic.up==null)return null;   /* measured nothing: no data, never 0 */
+  return {dn:+d.traffic.down||0,up:+d.traffic.up||0};
+ }
+ if(typeof d.traffic_mbps==='number')return {dn:d.traffic_mbps,up:0};
+ return null;
+}
+const UP_RATIO={server:.55,laptop:.14,audio:.02,phone:.12,media:.05,unknown:.3};
+function walk(cur,target,cap){return Math.max(cap*.005,Math.min(cap,cur+(target-cur)*.1+(Math.random()-.5)*cap*.08))}
+function tick(){
+ if(!data)return;
+ const live=data.source==='live';
+ let sDn=0,sUp=0;
+ nodes.forEach(n=>{
+  if(n.id==='__cloud'||n.d.kind==='router')return;
+  n.nofeed=false;n.sim=false;
+  if(n.d.status!=='online'){n.dn=n.up=0}
+  else{const f=feed(n.d);
+   if(f){n.dn=f.dn;n.up=f.up}
+   else if(live){n.dn=n.up=0;n.nofeed=true}
+   else{n.sim=true;
+    const base=n.capDn*(n.d.kind==='server'?.38:n.d.kind==='laptop'?.24:.14)*(.7+hash(n.id)*.6);
+    n.dn=walk(n.dn||base,base,n.capDn);
+    n.up=walk(n.up||n.dn*(UP_RATIO[n.d.kind]||.1),n.dn*(UP_RATIO[n.d.kind]||.1),n.capUp);
+    if(Math.random()<.012)n.dn=n.capDn*(.62+Math.random()*.34);
+    if(Math.random()<.008)n.up=n.capUp*(.6+Math.random()*.35);}
+  }
+  n.uDn=n.dn/n.capDn;n.uUp=n.up/n.capUp;n.u=Math.max(n.uDn,n.uUp);sDn+=n.dn;sUp+=n.up;
+ });
+ const gw=[...nodes.values()].find(n=>n.d.kind==='router');
+ if(gw){const f=feed(gw.d);gw.nofeed=false;gw.sim=!f&&!live;
+  if(f){gw.dn=f.dn;gw.up=f.up}else{gw.dn=sDn;gw.up=sUp;gw.nofeed=live}
+  gw.uDn=gw.dn/gw.capDn;gw.uUp=gw.up/gw.capUp;gw.u=Math.max(gw.uDn,gw.uUp);}
+ nodes.forEach(n=>{n.hDn.push(n.dn);n.hUp.push(n.up);if(n.hDn.length>60){n.hDn.shift();n.hUp.shift()}});
+ hud(gw);
+ recolor();
+ if(sel)renderSpark();
+}
+function hud(gw){
+ const dn=gw?gw.dn:0,up=gw?gw.up:0,cd=gw?gw.capDn:1000,cu=gw?gw.capUp:1000;
+ $('totDn').textContent=fmtBw(dn);$('totUp').textContent=fmtBw(up);
+ $('wanPct').textContent='WAN ▼'+Math.round(dn/cd*100)+'% ▲'+Math.round(up/cu*100)+'%';
+ const sb=$('simBadge');
+ if(data.source==='live'){const any=[...nodes.values()].some(n=>feed(n.d));sb.style.display=any?'none':'inline-block';sb.textContent='NO TRAFFIC FEED';
+  if(any&&gw&&gw.nofeed){sb.style.display='inline-block';sb.textContent='WAN = SUM OF FEEDS'}}
+ else{sb.style.display='inline-block';sb.textContent=innerWidth<760?'DEMO':'DEMO · SIMULATED TRAFFIC';sb.title='Offline demo with simulated traffic. The live map runs on the monitoring host at http://localhost:8787.'}
+ meter('meterDn',dn/cd);meter('meterUp',up/cu);
+}
+function meter(id,u){const m=$(id);if(!m.children.length)for(let i=0;i<20;i++)m.appendChild(document.createElement('i'));
+ [...m.children].forEach((b,i)=>{const on=i/20<u;const c=i<12?'#2fe08a':i<17?'#f2c230':'#ff4d5a';b.style.background=on?c:'#0f2130';b.style.boxShadow=on?'0 0 6px '+c:'none'})}
+function loadCol(u){return u<.6?COL.g:u<.85?COL.y:COL.r}
+function recolor(){
+ nodes.forEach(n=>{
+  if(n.id==='__cloud'||n.d.kind==='router'||!n.d.approved||n.d.status!=='online')return;
+  const c=n.nofeed?COL.cy:loadCol(n.u);[n.core,n.wire,n.halo,n.teth,n.ring].forEach(o=>o&&o.material.color.setHex(c));n.col=c;
+ });
+ links.forEach(L=>{if(!L.live)return;const r=L.rate;
+  [[L.dn,r.uDn],[L.up,r.uUp]].forEach(([ln,u])=>{const c=L.unk?COL.r:r.nofeed?COL.off:loadCol(u);ln.u=u;ln.col=c;
+   ln.ln.material.color.setHex(c);ln.head.material.color.setHex(c);ln.ps.forEach(p=>p.s.material.color.setHex(c))})});
+}
+function fmtBw(m){return m>=1000?(m/1000).toFixed(2)+' Gbps':m>=10?Math.round(m)+' Mbps':m>=1?m.toFixed(1)+' Mbps':Math.round(m*1000)+' kbps'}
+function fmtShort(m){return m>=1000?(m/1000).toFixed(2)+'G':m>=10?Math.round(m)+'':m>=1?m.toFixed(1):m.toFixed(2)}
+
+/* ---------- picking + panel ---------- */
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();let down=null;
+C.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY}});
+C.addEventListener('pointerup',e=>{if(!down)return;const moved=Math.hypot(e.clientX-down.x,e.clientY-down.y);down=null;if(moved>6)return;
+ const r=C.getBoundingClientRect();ptr.x=((e.clientX-r.left)/r.width)*2-1;ptr.y=-((e.clientY-r.top)/r.height)*2+1;ray.setFromCamera(ptr,cam);
+ const hits=ray.intersectObjects([...nodes.values()].map(n=>n.hit));
+ if(hits.length)select(hits[0].object.userData.id);else closePanel();});
+addEventListener('keydown',e=>{if(e.key==='Escape')closePanel()});
+
+let camGoal=null;
+function select(id){sel=id;const n=nodes.get(id);if(!n)return;ctl.autoRotate=false;idleT=0;camGoal=n.v.clone();renderPanel();$('panel').classList.add('open')}
+function closePanel(){sel=null;camGoal=new THREE.Vector3(0,2.6,0);$('panel').classList.remove('open')}
+
+function rateSrc(n){return n.id==='__cloud'?([...nodes.values()].find(x=>x.d.kind==='router')||n):n}
+function renderPanel(){
+ const n=nodes.get(sel);if(!n)return;const d=n.d;
+ const isCloud=n.id==='__cloud',src=rateSrc(n);
+ const st=isCloud?'WAN UPLINK':!d.approved?'UNAPPROVED':d.status==='online'?'ONLINE':d.status==='absent'?'NOT SEEN IN LAST SCAN':'ASLEEP / NOT RESPONDING';
+ const stc=!d.approved?'var(--r)':d.status==='online'?'var(--g)':'var(--mut)';
+ const finds=(data.findings||[]).filter(f=>f.ip===d.ip);
+ let h='<div class="ph"><div><h2>'+esc(d.hostname||d.label)+'</h2><div class="kind">'+esc(d.model||KIND_NAME[d.kind]||'')+'</div></div><button class="x" id="px" aria-label="Close">✕</button></div>';
+ h+='<div class="state" style="color:'+stc+'">● '+st+'</div>';
+ if(!isCloud){
+  h+='<dl class="kv"><dt>IP</dt><dd>'+esc(d.ip)+'</dd><dt>MAC</dt><dd>'+esc(d.mac||'--')+'</dd><dt>Vendor</dt><dd>'+esc(d.vendor||'unknown')+'</dd><dt>Type</dt><dd>'+esc(KIND_NAME[d.kind]||d.kind)+'</dd>';
+  if(d.last_seen)h+='<dt>Last seen</dt><dd>'+esc(fmtDate(d.last_seen))+'</dd>';
+  if(d.first_seen)h+='<dt>First seen</dt><dd>'+esc(fmtDate(d.first_seen))+'</dd>';
+  h+='</dl>';
+ }else{h+='<dl class="kv"><dt>Path</dt><dd>Router WAN ↔ ISP</dd><dt>Plan</dt><dd>▼'+Math.round(src.capDn)+' / ▲'+Math.round(src.capUp)+' Mbps</dd></dl>'}
+ if(d.status==='online'||isCloud){
+  const tag=src.sim?' · SIMULATED':src.nofeed?(src.d.kind==='router'?' · SUM OF FEEDS':' · NO FEED'):' · LIVE';
+  h+='<div class="sec"><h4>'+(src.d.kind==='router'?'WAN ':'')+'THROUGHPUT'+tag+'</h4>'
+   +'<div class="rates"><div class="rate dn"><span class="ar">▼</span><span class="lb">DOWNLINK</span><b id="rDn">--</b><span class="pc" id="pDn"></span></div>'
+   +'<div class="rate up"><span class="ar">▲</span><span class="lb">UPLINK</span><b id="rUp">--</b><span class="pc" id="pUp"></span></div></div>'
+   +'<canvas id="spark"></canvas><div class="sk"><span><i class="kd"></i>down</span><span><i class="ku"></i>up</span><span class="muted">last 60 s · dashed = 60% / 85%</span></div></div>'}
+ if(finds.length){h+='<div class="sec"><h4>SECURITY</h4>'+finds.map(f=>'<div class="find '+f.severity+'"><b>'+esc(f.title)+'</b><br>'+esc(f.detail)+'</div>').join('')+'</div>'}
+ if(d.ports&&d.ports.length){h+='<div class="sec"><h4>OPEN PORTS</h4><table class="ports">'+d.ports.map(p=>'<tr><td>'+p.port+'/'+(p.proto||'tcp')+'</td><td>'+esc(p.service)+(p.version?'<br><span class="muted">'+esc(p.version)+'</span>':'')+'</td></tr>').join('')+'</table></div>'}
+ else if(!isCloud){h+='<div class="sec"><h4>OPEN PORTS</h4><div class="muted" style="font-size:11px">'+(d.status==='online'?'None found in top ports':'Not scanned, host not responding')+'</div></div>'}
+ if(!isCloud)h+='<div class="btns"><button class="btn" id="cpIp">Copy IP</button><button class="btn" id="cpMac">Copy MAC</button></div>';
+ $('pcard').innerHTML=h;
+ $('px').onclick=closePanel;
+ const cp=(t,b)=>{try{navigator.clipboard.writeText(t).then(()=>{b.textContent='Copied';setTimeout(()=>renderPanel(),900)},()=>{b.textContent='Copy blocked'})}catch(e){b.textContent='Copy blocked'}};
+ if($('cpIp'))$('cpIp').onclick=e=>cp(d.ip,e.target);
+ if($('cpMac'))$('cpMac').onclick=e=>cp(d.mac||'',e.target);
+ renderSpark();
+}
+function renderSpark(){
+ const n=nodes.get(sel),cv=$('spark');if(!n||!cv)return;
+ const src=rateSrc(n);
+ $('rDn').textContent=fmtBw(src.dn||0);$('pDn').textContent=Math.round((src.uDn||0)*100)+'%';$('rDn').style.color=hex(loadCol(src.uDn||0));
+ $('rUp').textContent=fmtBw(src.up||0);$('pUp').textContent=Math.round((src.uUp||0)*100)+'%';$('rUp').style.color=hex(loadCol(src.uUp||0));
+ const w=cv.clientWidth,h=cv.clientHeight,dpr=Math.min(devicePixelRatio,2);cv.width=w*dpr;cv.height=h*dpr;
+ const x=cv.getContext('2d');x.scale(dpr,dpr);x.clearRect(0,0,w,h);
+ if(src.hDn.length<2)return;
+ /* each direction scaled to its own capacity so a small uplink is still readable */
+ x.strokeStyle='#143247';x.lineWidth=1;x.setLineDash([2,3]);[.6,.85].forEach(t=>{const y=h-t*h*.95-1;x.beginPath();x.moveTo(0,y);x.lineTo(w,y);x.stroke()});
+ const draw=(hs,cap,col,dash)=>{x.setLineDash(dash);x.strokeStyle=col;x.lineWidth=1.6;x.shadowColor=col;x.shadowBlur=6;x.beginPath();
+  hs.forEach((v,i)=>{const px=i/59*w,py=h-Math.min(1,v/cap)*h*.95-1;i?x.lineTo(px,py):x.moveTo(px,py)});x.stroke();x.shadowBlur=0};
+ draw(src.hDn,src.capDn,'#5ad1ff',[]);
+ draw(src.hUp,src.capUp,'#c79bff',[4,3]);
+}
+
+function overlap(r,placed){return placed.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y)}
+function declutter(){
+ const prio=n=>(n.id===sel?-1e3:0)+(n.d.status==='online'||!n.d.approved||n.id==='__cloud'?-100:0)+n._dist;
+ const vs=[...nodes.values()].filter(n=>n._vis).sort((a,b)=>prio(a)-prio(b));
+ const placed=[];
+ vs.forEach(n=>{const r={x:n._sx-48,y:n._sy,w:96,h:30};if(overlap(r,placed))n.lab.style.opacity='0';else placed.push(r)});
+ /* path readouts after node labels; the selected device's readouts get first pick */
+ const ls=[];links.forEach(L=>{if(L.live)[L.dn,L.up].forEach(p=>{if(p._vis)ls.push({p,k:(L.child.id===sel||L.rate.id===sel?-1e3:0)+p._dist})})});
+ ls.sort((a,b)=>a.k-b.k).forEach(({p})=>{const r={x:p._sx-34,y:p._sy-9,w:68,h:18};if(overlap(r,placed))p.lab.style.opacity='0';else placed.push(r)});
+}
+
+/* ---------- loop ---------- */
+function size(){const w=innerWidth,h=innerHeight;R.setSize(w,h,false);comp.setSize(w,h);bloom.resolution.set(w,h);cam.aspect=w/h;cam.fov=w<760?62:50;cam.updateProjectionMatrix();}
+addEventListener('resize',size);size();
+if(innerWidth<760)cam.position.set(19,15,23);
+const clk=new THREE.Clock(),Y=new THREE.Vector3(0,1,0),tmp=new THREE.Vector3(),tan=new THREE.Vector3();
+function project(v,w,h){tmp.copy(v).project(cam);return {ok:tmp.z<1&&tmp.z>-1,x:(tmp.x*.5+.5)*w,y:(-tmp.y*.5+.5)*h}}
+function loop(){
+ const dt=Math.min(clk.getDelta(),.05),t=clk.elapsedTime;
+ if(!ctl.autoRotate){idleT+=dt;if(idleT>8&&!sel)ctl.autoRotate=true}
+ if(camGoal){ctl.target.lerp(camGoal,.06);if(ctl.target.distanceTo(camGoal)<.01)camGoal=null}
+ ctl.update();
+ const sw=(t*.22)%1;sweep.scale.setScalar(.5+sw*11);sweep.material.opacity=.45*(1-sw);
+ nodes.forEach((n,id)=>{
+  const i=hash(id)*10,live=n.d.status==='online'||n.id==='__cloud';
+  const bob=live?Math.sin(t*1.1+i)*.08:0;
+  [n.core,n.wire,n.halo,n.hit,n.warn].forEach(o=>o&&(o.position.y=n.v.y+bob));
+  if(ICONSET==='device'){n.core.rotation.y+=dt*(live?.35:.08)}   // devices turn upright, never tumble
+  else{n.core.rotation.y+=dt*(live?.5:.1);n.core.rotation.x+=dt*(live?.2:0)}
+  n.wire.rotation.y-=dt*.25;n.wire.rotation.z+=dt*.1;
+  const pulse=1+.1*Math.sin(t*2.2+i);
+  n.halo.scale.setScalar(n.r*6*pulse*(live?1:.7)*(id===sel?1.5:1));
+  if(n.ring){n.ring.scale.setScalar(1+.18*Math.sin(t*1.6+i)+(id===sel?.6:0))}
+  if(n.warn){n.warn.quaternion.copy(cam.quaternion);const k=.5+.5*Math.sin(t*5);n.warn.material.opacity=.35+.65*k;n.warn.scale.setScalar(1+.15*k);n.halo.material.opacity=.3+.5*k}
+  const k=1-Math.exp(-dt*6);n.shDn+=(n.dn-n.shDn)*k;n.shUp+=(n.up-n.shUp)*k;   // smooth the readouts between samples
+ });
+ const w=innerWidth,h=innerHeight;
+ links.forEach(L=>{
+  if(!L.live)return;const r=L.rate,focus=!sel||L.child.id===sel||L.rate.id===sel;
+  [L.dn,L.up].forEach(p=>{
+   const idle=r.nofeed?0:(p.dir==='dn'?r.dn:r.up)<.05;
+   const sp=idle?0:.1+Math.min(1,p.u)*.55;
+   p.ps.forEach(q=>{q.t=(q.t+dt*sp)%1;q.s.position.copy(p.cv.getPoint(q.t));q.s.visible=!idle&&!r.nofeed});
+   const ht=.9;p.head.position.copy(p.cv.getPoint(ht));p.cv.getTangent(ht,tan);p.head.quaternion.setFromUnitVectors(Y,tan.normalize());
+   p.ln.material.opacity=focus?.6:.18;p.head.material.opacity=focus?.95:.25;
+   /* numeric readout rides the lane: downlink near the device end, uplink near the router end */
+   const pt=p.cv.getPoint(.62),s=project(pt,w,h);p._vis=s.ok;
+   if(!s.ok){p.lab.style.display='none';return}
+   p.lab.style.display='block';p.lab.style.left=s.x+'px';p.lab.style.top=s.y+'px';p._sx=s.x;p._sy=s.y;p._dist=cam.position.distanceTo(pt);
+   const v=p.dir==='dn'?r.shDn:r.shUp;
+   const html=r.nofeed&&r.d.kind!=='router'?'<i>'+(p.dir==='dn'?'▼':'▲')+'</i>--':'<i style="color:'+hex(p.col)+'">'+(p.dir==='dn'?'▼':'▲')+'</i>'+fmtShort(v)+'<small>Mbps</small>';
+   if(p._h!==html){p.lab.innerHTML=html;p._h=html}
+   p.lab.style.opacity=focus?Math.max(.45,Math.min(1,1.7-p._dist/24)).toFixed(2):'.25';
+  });
+ });
+ nodes.forEach((n,id)=>{
+  const s=project(n.core.position,w,h);n._vis=false;
+  if(!s.ok){n.lab.style.display='none';return}n.lab.style.display='block';
+  const ly=s.y+n.r*30+10;n.lab.style.left=s.x+'px';n.lab.style.top=ly+'px';
+  const dist=cam.position.distanceTo(n.core.position);n.lab.style.opacity=Math.max(.3,Math.min(1,1.7-dist/26)).toFixed(2);
+  const d=n.d,unk=!d.approved,live=d.status==='online';
+  const c=n.id==='__cloud'?'#7fe3ff':unk?'#ff4d5a':live?hex(n.col):'#5c6b78';
+  const src=rateSrc(n);
+  const val=n.id==='__cloud'||d.kind==='router'?'▼'+fmtShort(src.shDn)+' ▲'+fmtShort(src.shUp)
+   :unk?'UNAPPROVED':live?(n.nofeed?'online · no feed':'▼'+fmtShort(n.shDn)+' ▲'+fmtShort(n.shUp)):d.status==='absent'?'not seen':'asleep';
+  const html='<b style="color:'+(unk?'#ff8088':'#cfe9f5')+'">'+esc(d.label||d.hostname||d.ip)+'</b><br><span class="v" style="color:'+c+'">'+val+'</span>';
+  if(n._h!==html){n.lab.innerHTML=html;n._h=html}
+  n.lab.classList.toggle('sel',id===sel);
+  n._sx=s.x;n._sy=ly;n._dist=dist;n._vis=true;
+ });
+ declutter();
+ comp.render();
+ requestAnimationFrame(loop);
+}
+
+/* ---------- boot: try live agent, fall back to embedded snapshot ---------- */
+apply(JSON.parse($('snapshot').textContent));
+tick();setInterval(()=>{if(data&&data.source!=='live')tick()},1000);
+loop();
+(async function live(){
+ if(location.protocol==='file:')return;
+ try{
+  const ac=new AbortController();setTimeout(()=>ac.abort(),2500);
+  const r=await fetch('api/topology',{signal:ac.signal,cache:'no-store'});
+  if(!r.ok)return;const j=await r.json();if(!j||!Array.isArray(j.devices))return;
+  apply(j);
+  if(window.EventSource){const es=new EventSource('api/stream');es.onmessage=e=>{try{apply(JSON.parse(e.data))}catch(_){}};es.onerror=()=>{$('srcBadge').textContent='RECONNECTING';$('srcBadge').className='badge b-snap'}}
+ }catch(_){}
+})();
+})();
+</script>
+</body>
+</html>
